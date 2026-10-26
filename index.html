@@ -29,9 +29,17 @@
                 </div>
             </div>
             
-            <div id="live-clock" class="text-right font-mono bg-slate-900/60 px-4 py-2 rounded-xl border border-slate-700/50">
-                <div class="text-xs text-slate-400">System Time</div>
-                <div class="text-lg font-semibold text-indigo-400" id="clock-display">00:00:00</div>
+            <div class="flex items-center space-x-4">
+                <!-- Floating Mini-Window Trigger Button -->
+                <button onclick="openPiPWindow()" id="pip-trigger-btn" class="hidden bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-300 text-xs px-3.5 py-2.5 rounded-xl transition-all flex items-center space-x-2">
+                    <i data-lucide="picture-in-picture-2" class="w-4 h-4"></i>
+                    <span>Open Mini Timer Window</span>
+                </button>
+
+                <div id="live-clock" class="text-right font-mono bg-slate-900/60 px-4 py-2 rounded-xl border border-slate-700/50">
+                    <div class="text-xs text-slate-400">System Time</div>
+                    <div class="text-lg font-semibold text-indigo-400" id="clock-display">00:00:00</div>
+                </div>
             </div>
         </header>
 
@@ -166,6 +174,7 @@
         let timerInterval = null;
         let activeSession = null;
         let logs = JSON.parse(localStorage.getItem('training_logs') || '[]');
+        let pipWindowObj = null;
 
         // Initialize Lucide Icons
         lucide.createIcons();
@@ -184,6 +193,21 @@
                 resumeTimerUI();
             }
             renderLogs();
+        });
+
+        // Sync state across browser tabs/windows using localStorage events
+        window.addEventListener('storage', (e) => {
+            if (e.key === 'active_training_session') {
+                if (!e.newValue) {
+                    activeSession = null;
+                    resetUI();
+                    renderLogs();
+                }
+            }
+            if (e.key === 'training_logs') {
+                logs = JSON.parse(e.newValue || '[]');
+                renderLogs();
+            }
         });
 
         function startTimer() {
@@ -244,6 +268,11 @@
 
             document.getElementById('start-timestamp').innerText = `Started at: ${activeSession.startTimeStr}`;
 
+            // Show Mini Window (PiP) trigger button if supported
+            if ('documentPictureInPicture' in window) {
+                document.getElementById('pip-trigger-btn').classList.remove('hidden');
+            }
+
             // Run Live Timer Interval
             const startMs = new Date(activeSession.startTimeIso).getTime();
             if (timerInterval) clearInterval(timerInterval);
@@ -251,14 +280,81 @@
             timerInterval = setInterval(() => {
                 const nowMs = new Date().getTime();
                 const diffSec = Math.floor((nowMs - startMs) / 1000);
-                document.getElementById('timer-display').innerText = formatSeconds(diffSec);
+                const formattedTime = formatSeconds(diffSec);
+                
+                document.getElementById('timer-display').innerText = formattedTime;
+
+                // Update PiP window display if open
+                if (pipWindowObj && !pipWindowObj.closed) {
+                    const pipTimer = pipWindowObj.document.getElementById('pip-timer');
+                    if (pipTimer) pipTimer.innerText = formattedTime;
+                }
             }, 1000);
+        }
+
+        // Open floating mini window using Document PiP API (always stays on top of training site)
+        async function openPiPWindow() {
+            if (!('documentPictureInPicture' in window) || !activeSession) return;
+
+            try {
+                pipWindowObj = await window.documentPictureInPicture.requestWindow({
+                    width: 320,
+                    height: 200
+                });
+
+                // Copy styles/Tailwind over to PiP window
+                const styleEl = pipWindowObj.document.createElement('style');
+                styleEl.innerHTML = `
+                    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+                    body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; margin: 0; display: flex; flex-direction: column; height: 100vh; justify-content: space-between; padding: 16px; box-sizing: border-box; }
+                    .btn-end { background-color: #e11d48; color: white; border: none; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; transition: background 0.2s; }
+                    .btn-end:hover { background-color: #be123c; }
+                `;
+                pipWindowObj.document.head.appendChild(styleEl);
+
+                // Populate PiP Window content
+                pipWindowObj.document.body.innerHTML = `
+                    <div>
+                        <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 600; letter-spacing: 0.05em; margin-bottom: 2px;">Active Training</div>
+                        <div style="font-size: 14px; font-weight: 700; color: #ffffff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${escapeHtml(activeSession.title)}">${escapeHtml(activeSession.title)}</div>
+                        <div style="font-size: 12px; color: #cbd5e1; margin-top: 1px;">${escapeHtml(activeSession.trainee)}</div>
+                    </div>
+                    <div style="text-align: center; background: rgba(30, 41, 59, 0.8); padding: 10px; border-radius: 8px; border: 1px solid #334155;">
+                        <div style="font-size: 10px; color: #94a3b8; text-transform: uppercase;">Elapsed Time</div>
+                        <div id="pip-timer" style="font-family: monospace; font-size: 28px; font-weight: bold; color: #34d399;">00:00:00</div>
+                    </div>
+                    <div>
+                        <button class="btn-end" onclick="window.opener.stopTimerFromPiP()">End & Save Training</button>
+                    </div>
+                `;
+
+                // Handle PiP window close event
+                pipWindowObj.addEventListener('pagehide', () => {
+                    pipWindowObj = null;
+                });
+
+            } catch (err) {
+                console.error("PiP window error:", err);
+            }
+        }
+
+        function stopTimerFromPiP() {
+            if (pipWindowObj) {
+                pipWindowObj.close();
+                pipWindowObj = null;
+            }
+            stopTimer();
         }
 
         function stopTimer() {
             if (!activeSession) return;
 
             clearInterval(timerInterval);
+            if (pipWindowObj && !pipWindowObj.closed) {
+                pipWindowObj.close();
+                pipWindowObj = null;
+            }
+
             const endTime = new Date();
             const startMs = new Date(activeSession.startTimeIso).getTime();
             const durationSec = Math.floor((endTime.getTime() - startMs) / 1000);
@@ -302,6 +398,7 @@
 
             document.getElementById('timer-display').innerText = "00:00:00";
             document.getElementById('start-timestamp').innerText = "";
+            document.getElementById('pip-trigger-btn').classList.add('hidden');
         }
 
         function formatSeconds(sec) {
