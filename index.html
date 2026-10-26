@@ -1,1 +1,409 @@
-# Training-timer
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Time Tracker</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row justify-between items-center mb-8 bg-slate-800 p-6 rounded-2xl border border-slate-700 shadow-xl">
+            <div class="flex items-center space-x-3 mb-4 md:mb-0">
+                <div class="bg-indigo-600 p-3 rounded-xl shadow-lg shadow-indigo-500/30">
+                    <i data-lucide="clock" class="w-8 h-8 text-white"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">Training Time Tracker</h1>
+                    <p class="text-xs text-slate-400">Automated session time capture & activity logging</p>
+                </div>
+            </div>
+            
+            <div id="live-clock" class="text-right font-mono bg-slate-900/60 px-4 py-2 rounded-xl border border-slate-700/50">
+                <div class="text-xs text-slate-400">System Time</div>
+                <div class="text-lg font-semibold text-indigo-400" id="clock-display">00:00:00</div>
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Left Side: Active Session Control Panel -->
+            <div class="lg:col-span-5 space-y-6">
+                <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl relative overflow-hidden">
+                    <div id="status-bar" class="absolute top-0 left-0 right-0 h-1.5 bg-slate-600 transition-all duration-300"></div>
+                    
+                    <h2 class="text-lg font-semibold mb-4 text-white flex items-center justify-between">
+                        <span>Active Session</span>
+                        <span id="status-badge" class="text-xs px-2.5 py-1 rounded-full bg-slate-700 text-slate-300 font-medium">Ready</span>
+                    </h2>
+
+                    <form id="tracker-form" class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Trainee Name *</label>
+                            <input type="text" id="trainee-name" required placeholder="Enter full name" 
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">Training Program / Module *</label>
+                            <input type="text" id="training-title" required placeholder="e.g. Customer Support Excellence" 
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-medium text-slate-400 mb-1">External Training URL (Optional)</label>
+                            <input type="url" id="training-url" placeholder="https://lms.company.com/course" 
+                                class="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors text-sm">
+                        </div>
+
+                        <!-- Timer Display Box -->
+                        <div class="bg-slate-900/80 p-6 rounded-xl border border-slate-700/80 text-center my-6">
+                            <div class="text-xs text-slate-400 uppercase tracking-widest font-semibold mb-1">Elapsed Duration</div>
+                            <div id="timer-display" class="font-mono text-4xl font-bold text-slate-300 tracking-wider">00:00:00</div>
+                            <div id="start-timestamp" class="text-xs text-slate-500 mt-2 h-4"></div>
+                        </div>
+
+                        <!-- Action Controls -->
+                        <div class="grid grid-cols-2 gap-3">
+                            <button type="button" id="btn-start" onclick="startTimer()" 
+                                class="w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center space-x-2">
+                                <i data-lucide="play" class="w-4 h-4 fill-current"></i>
+                                <span>Start Training</span>
+                            </button>
+
+                            <button type="button" id="btn-stop" onclick="stopTimer()" disabled 
+                                class="w-full bg-rose-600/40 text-rose-300 cursor-not-allowed font-medium py-3 rounded-xl transition-all flex items-center justify-center space-x-2">
+                                <i data-lucide="square" class="w-4 h-4 fill-current"></i>
+                                <span>End & Save</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Right Side: Logs Table & Analytics -->
+            <div class="lg:col-span-7 space-y-6">
+                <!-- Metrics Summary Card -->
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <div class="text-xs text-slate-400">Total Sessions</div>
+                        <div id="stat-sessions" class="text-xl font-bold text-white mt-1">0</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <div class="text-xs text-slate-400">Total Hours Spent</div>
+                        <div id="stat-hours" class="text-xl font-bold text-indigo-400 mt-1">0.0h</div>
+                    </div>
+                    <div class="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                        <div class="text-xs text-slate-400">Avg Session</div>
+                        <div id="stat-avg" class="text-xl font-bold text-purple-400 mt-1">0m</div>
+                    </div>
+                </div>
+
+                <!-- Logs List Card -->
+                <div class="bg-slate-800 rounded-2xl p-6 border border-slate-700 shadow-xl space-y-4">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <h2 class="text-lg font-semibold text-white">Training History Logs</h2>
+                        
+                        <div class="flex items-center space-x-2 w-full sm:w-auto">
+                            <button onclick="exportCSV()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg transition-colors flex items-center space-x-1">
+                                <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                                <span>CSV</span>
+                            </button>
+                            <button onclick="copyTableToClipboard()" class="bg-indigo-600/80 hover:bg-indigo-600 text-white text-xs px-3 py-2 rounded-lg transition-colors flex items-center space-x-1">
+                                <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+                                <span>Copy for Excel</span>
+                            </button>
+                            <button onclick="clearLogs()" class="bg-rose-900/40 hover:bg-rose-900/60 text-rose-300 text-xs px-3 py-2 rounded-lg transition-colors">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="relative">
+                        <i data-lucide="search" class="w-4 h-4 text-slate-500 absolute left-3 top-3"></i>
+                        <input type="text" id="search-input" onkeyup="renderLogs()" placeholder="Search trainees, topics, or dates..." 
+                            class="w-full bg-slate-900/90 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500">
+                    </div>
+
+                    <!-- Table -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-700 max-h-96">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="bg-slate-900/90 text-slate-400 sticky top-0 border-b border-slate-700">
+                                <tr>
+                                    <th class="py-3 px-4 font-medium">Date</th>
+                                    <th class="py-3 px-4 font-medium">Trainee</th>
+                                    <th class="py-3 px-4 font-medium">Training Title</th>
+                                    <th class="py-3 px-4 font-medium">Start</th>
+                                    <th class="py-3 px-4 font-medium">End</th>
+                                    <th class="py-3 px-4 font-medium">Duration</th>
+                                    <th class="py-3 px-4 font-medium text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-tbody" class="divide-y divide-slate-700/50 text-slate-300">
+                                <!-- Dynamic rows populated via Javascript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // State variables
+        let timerInterval = null;
+        let activeSession = null;
+        let logs = JSON.parse(localStorage.getItem('training_logs') || '[]');
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // System Clock
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('clock-display').innerText = now.toLocaleTimeString();
+        }, 1000);
+
+        // Check active session from localStorage on startup
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedActive = localStorage.getItem('active_training_session');
+            if (savedActive) {
+                activeSession = JSON.parse(savedActive);
+                resumeTimerUI();
+            }
+            renderLogs();
+        });
+
+        function startTimer() {
+            const trainee = document.getElementById('trainee-name').value.trim();
+            const title = document.getElementById('training-title').value.trim();
+            const url = document.getElementById('training-url').value.trim();
+
+            if (!trainee || !title) {
+                alert('Please enter both the Trainee Name and Training Title.');
+                return;
+            }
+
+            const startTime = new Date();
+
+            activeSession = {
+                id: Date.now(),
+                trainee: trainee,
+                title: title,
+                url: url,
+                startTimeIso: startTime.toISOString(),
+                dateStr: startTime.toLocaleDateString(),
+                startTimeStr: startTime.toLocaleTimeString()
+            };
+
+            localStorage.setItem('active_training_session', JSON.stringify(activeSession));
+
+            // Launch URL in new tab if provided
+            if (url) {
+                window.open(url, '_blank');
+            }
+
+            resumeTimerUI();
+        }
+
+        function resumeTimerUI() {
+            document.getElementById('trainee-name').value = activeSession.trainee;
+            document.getElementById('training-title').value = activeSession.title;
+            document.getElementById('training-url').value = activeSession.url || '';
+
+            // Disable input fields while session is active
+            document.getElementById('trainee-name').disabled = true;
+            document.getElementById('training-title').disabled = true;
+            document.getElementById('training-url').disabled = true;
+
+            // Toggle Buttons
+            const btnStart = document.getElementById('btn-start');
+            btnStart.disabled = true;
+            btnStart.className = "w-full bg-slate-700 text-slate-500 cursor-not-allowed font-medium py-3 rounded-xl flex items-center justify-center space-x-2";
+
+            const btnStop = document.getElementById('btn-stop');
+            btnStop.disabled = false;
+            btnStop.className = "w-full bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-rose-600/20 flex items-center justify-center space-x-2";
+
+            // Update Badge & Status bar
+            document.getElementById('status-badge').innerText = "In Progress";
+            document.getElementById('status-badge').className = "text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-400 font-medium border border-emerald-500/30";
+            document.getElementById('status-bar').className = "absolute top-0 left-0 right-0 h-1.5 bg-emerald-500 transition-all duration-300";
+
+            document.getElementById('start-timestamp').innerText = `Started at: ${activeSession.startTimeStr}`;
+
+            // Run Live Timer Interval
+            const startMs = new Date(activeSession.startTimeIso).getTime();
+            if (timerInterval) clearInterval(timerInterval);
+
+            timerInterval = setInterval(() => {
+                const nowMs = new Date().getTime();
+                const diffSec = Math.floor((nowMs - startMs) / 1000);
+                document.getElementById('timer-display').innerText = formatSeconds(diffSec);
+            }, 1000);
+        }
+
+        function stopTimer() {
+            if (!activeSession) return;
+
+            clearInterval(timerInterval);
+            const endTime = new Date();
+            const startMs = new Date(activeSession.startTimeIso).getTime();
+            const durationSec = Math.floor((endTime.getTime() - startMs) / 1000);
+
+            const newLog = {
+                id: activeSession.id,
+                date: activeSession.dateStr,
+                trainee: activeSession.trainee,
+                title: activeSession.title,
+                startTime: activeSession.startTimeStr,
+                endTime: endTime.toLocaleTimeString(),
+                durationSec: durationSec,
+                durationFormatted: formatSeconds(durationSec)
+            };
+
+            logs.unshift(newLog);
+            localStorage.setItem('training_logs', JSON.stringify(logs));
+            localStorage.removeItem('active_training_session');
+
+            activeSession = null;
+            resetUI();
+            renderLogs();
+        }
+
+        function resetUI() {
+            document.getElementById('trainee-name').disabled = false;
+            document.getElementById('training-title').disabled = false;
+            document.getElementById('training-url').disabled = false;
+
+            const btnStart = document.getElementById('btn-start');
+            btnStart.disabled = false;
+            btnStart.className = "w-full bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-medium py-3 rounded-xl transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center space-x-2";
+
+            const btnStop = document.getElementById('btn-stop');
+            btnStop.disabled = true;
+            btnStop.className = "w-full bg-rose-600/40 text-rose-300 cursor-not-allowed font-medium py-3 rounded-xl flex items-center justify-center space-x-2";
+
+            document.getElementById('status-badge').innerText = "Ready";
+            document.getElementById('status-badge').className = "text-xs px-2.5 py-1 rounded-full bg-slate-700 text-slate-300 font-medium";
+            document.getElementById('status-bar').className = "absolute top-0 left-0 right-0 h-1.5 bg-slate-600 transition-all duration-300";
+
+            document.getElementById('timer-display').innerText = "00:00:00";
+            document.getElementById('start-timestamp').innerText = "";
+        }
+
+        function formatSeconds(sec) {
+            const h = Math.floor(sec / 3600);
+            const m = Math.floor((sec % 3600) / 60);
+            const s = sec % 60;
+            return [h, m, s].map(v => String(v).padStart(2, '0')).join(':');
+        }
+
+        function renderLogs() {
+            const tbody = document.getElementById('logs-tbody');
+            const query = (document.getElementById('search-input').value || '').toLowerCase();
+
+            const filteredLogs = logs.filter(item => 
+                item.trainee.toLowerCase().includes(query) ||
+                item.title.toLowerCase().includes(query) ||
+                item.date.toLowerCase().includes(query)
+            );
+
+            if (filteredLogs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-6 text-slate-500">No logs found</td></tr>`;
+            } else {
+                tbody.innerHTML = filteredLogs.map(log => `
+                    <tr class="hover:bg-slate-700/30 transition-colors">
+                        <td class="py-3 px-4 font-medium text-slate-300 whitespace-nowrap">${log.date}</td>
+                        <td class="py-3 px-4 font-medium text-white whitespace-nowrap">${escapeHtml(log.trainee)}</td>
+                        <td class="py-3 px-4 text-slate-300">${escapeHtml(log.title)}</td>
+                        <td class="py-3 px-4 text-slate-400 font-mono whitespace-nowrap">${log.startTime}</td>
+                        <td class="py-3 px-4 text-slate-400 font-mono whitespace-nowrap">${log.endTime}</td>
+                        <td class="py-3 px-4 font-mono font-semibold text-emerald-400 whitespace-nowrap">${log.durationFormatted}</td>
+                        <td class="py-3 px-4 text-center">
+                            <button onclick="deleteLog(${log.id})" class="text-slate-500 hover:text-rose-400 transition-colors">
+                                <i data-lucide="trash-2" class="w-4 h-4 inline"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+            }
+
+            // Update Metrics
+            const totalSec = logs.reduce((acc, curr) => acc + curr.durationSec, 0);
+            document.getElementById('stat-sessions').innerText = logs.length;
+            document.getElementById('stat-hours').innerText = (totalSec / 3600).toFixed(1) + 'h';
+            document.getElementById('stat-avg').innerText = logs.length > 0 ? Math.round((totalSec / logs.length) / 60) + 'm' : '0m';
+
+            lucide.createIcons();
+        }
+
+        function deleteLog(id) {
+            logs = logs.filter(l => l.id !== id);
+            localStorage.setItem('training_logs', JSON.stringify(logs));
+            renderLogs();
+        }
+
+        function clearLogs() {
+            if (confirm('Are you sure you want to clear all training history logs?')) {
+                logs = [];
+                localStorage.setItem('training_logs', JSON.stringify(logs));
+                renderLogs();
+            }
+        }
+
+        function exportCSV() {
+            if (logs.length === 0) {
+                alert('No logs available to export.');
+                return;
+            }
+
+            let csv = 'Date,Trainee Name,Training Title,Start Time,End Time,Duration (HH:MM:SS),Duration (Seconds)\n';
+            logs.forEach(l => {
+                csv += `"${l.date}","${l.trainee.replace(/"/g, '""')}","${l.title.replace(/"/g, '""')}","${l.startTime}","${l.endTime}","${l.durationFormatted}",${l.durationSec}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.setAttribute('href', url);
+            a.setAttribute('download', `training_log_${new Date().toISOString().slice(0,10)}.csv`);
+            a.click();
+        }
+
+        function copyTableToClipboard() {
+            if (logs.length === 0) {
+                alert('No data to copy.');
+                return;
+            }
+
+            let tsv = "Date\tTrainee\tTraining Title\tStart Time\tEnd Time\tDuration\n";
+            logs.forEach(l => {
+                tsv += `${l.date}\t${l.trainee}\t${l.title}\t${l.startTime}\t${l.endTime}\t${l.durationFormatted}\n`;
+            });
+
+            navigator.clipboard.writeText(tsv).then(() => {
+                alert('Training data copied to clipboard in TSV format! You can now paste (Ctrl+V) directly into Excel or Google Sheets.');
+            });
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/[&<>"']/g, function(m) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+            });
+        }
+    </script>
+</body>
+</html>
